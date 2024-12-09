@@ -3,6 +3,7 @@ package com.drama.shop.drama_shop_backend.Service;
 import com.drama.shop.drama_shop_backend.Model.User;
 import com.drama.shop.drama_shop_backend.Repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,6 +15,9 @@ public class UserService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private PasswordEncoder passwordEncoder; // Inyección del PasswordEncoder
+
     // Obtener todos los usuarios
     public List<User> getAllUsers() {
         return userRepository.findAll();
@@ -21,8 +25,8 @@ public class UserService {
 
     // Crear un nuevo usuario
     public User createUser(User user) {
-        System.out.println("Datos recibidos: " + user);
-        validateUser(user); // Validaciones manuales
+        validateUser(user);
+        user.setPassword(passwordEncoder.encode(user.getPassword())); // Encriptar contraseña
         return userRepository.save(user);
     }
 
@@ -33,21 +37,16 @@ public class UserService {
 
     // Modificar un usuario existente
     public User updateUser(Long id, User user) {
+        validateUser(user);
         Optional<User> optionalUser = userRepository.findById(id);
         if (optionalUser.isPresent()) {
             User existingUser = optionalUser.get();
-            if (user.getUsername() != null) {
-                existingUser.setUsername(user.getUsername());
+            existingUser.setUsername(user.getUsername());
+            if (!user.getPassword().isEmpty()) {
+                existingUser.setPassword(passwordEncoder.encode(user.getPassword())); // Encriptar contraseña
             }
-            if (user.getPassword() != null) {
-                existingUser.setPassword(user.getPassword());
-            }
-            if (user.getEmail() != null) {
-                existingUser.setEmail(user.getEmail());
-            }
-            if (user.getRole() != null) {
-                existingUser.setRole(user.getRole());
-            }
+            existingUser.setEmail(user.getEmail());
+            existingUser.setRole(user.getRole());
             return userRepository.save(existingUser);
         }
         return null;
@@ -78,4 +77,16 @@ public class UserService {
             throw new IllegalArgumentException("El rol es obligatorio");
         }
     }
+
+    public boolean authenticateUser(String email, String rawPassword) {
+        Optional<User> userOptional = userRepository.findByEmail(email); // Manejar Optional
+        if (userOptional.isPresent()) {
+            User user = userOptional.get(); // Extraer el usuario
+            return passwordEncoder.matches(rawPassword, user.getPassword());
+        }
+        return false; // Usuario no encontrado o contraseña inválida
+    }
+    
+    
+
 }
